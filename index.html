@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Book a Site Visit | Lead Capture Demo</title>
+  <meta name="description" content="Landing page template that saves every enquiry to Google Sheets and can forward it to your CRM.">
+  <style>
+    :root { --ink: #141414; --muted: #5c5c5c; --accent: #7cf000; --bg: #f6f6f3; --card: #ffffff; --error: #c0262d; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: var(--bg); line-height: 1.5; }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 48px 20px; display: grid; gap: 40px; grid-template-columns: 1.1fr 0.9fr; align-items: start; }
+    .eyebrow { display: inline-flex; gap: 8px; align-items: center; font-size: 14px; color: var(--muted); }
+    .eyebrow::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+    h1 { font-size: clamp(34px, 5vw, 56px); line-height: 1.05; margin: 12px 0 16px; letter-spacing: -0.02em; }
+    .lead { font-size: 18px; color: var(--muted); max-width: 52ch; }
+    ul.points { padding: 0; list-style: none; margin: 24px 0 0; display: grid; gap: 10px; }
+    ul.points li::before { content: "✓"; margin-right: 10px; color: #2f7d00; font-weight: 700; }
+    form { background: var(--card); border-radius: 20px; padding: 28px; box-shadow: 0 10px 40px rgba(0,0,0,0.06); display: grid; gap: 14px; }
+    form h2 { margin: 0 0 4px; font-size: 22px; }
+    label { font-size: 14px; font-weight: 600; display: grid; gap: 6px; }
+    input, select, textarea { font: inherit; padding: 12px 14px; border: 1px solid #dcdcd6; border-radius: 12px; background: #fff; }
+    input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); border-color: transparent; }
+    .hp { position: absolute; left: -9999px; }
+    button { font: inherit; font-weight: 700; padding: 14px; border: 0; border-radius: 999px; background: var(--accent); color: var(--ink); cursor: pointer; }
+    button[disabled] { opacity: 0.6; cursor: wait; }
+    .status { min-height: 1.5em; font-size: 14px; }
+    .status.error { color: var(--error); }
+    .status.ok { color: #2f7d00; }
+    .alt { font-size: 14px; color: var(--muted); text-align: center; }
+    .alt a { color: inherit; }
+    @media (max-width: 820px) { .wrap { grid-template-columns: 1fr; padding-top: 32px; } }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section>
+      <span class="eyebrow">New launch · Limited units</span>
+      <h1>Book a site visit for your new home</h1>
+      <p class="lead">Leave your details and our sales team will call you within one working day with floor plans, pricing and visit slots.</p>
+      <ul class="points">
+        <li>2 &amp; 3 BHK apartments with clubhouse access</li>
+        <li>Transparent pricing, no hidden charges</li>
+        <li>Free pick-up and drop for site visits</li>
+      </ul>
+    </section>
+
+    <form id="lead-form" novalidate>
+      <h2>Get pricing &amp; floor plans</h2>
+      <label>Full name
+        <input name="name" autocomplete="name" required minlength="2">
+      </label>
+      <label>Phone
+        <input name="phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="+971 5X XXX XXXX">
+      </label>
+      <label>Email
+        <input name="email" type="email" autocomplete="email">
+      </label>
+      <label>Interested in
+        <select name="project">
+          <option>2 BHK</option>
+          <option>3 BHK</option>
+          <option>Not sure yet</option>
+        </select>
+      </label>
+      <label>Message (optional)
+        <textarea name="message" rows="3"></textarea>
+      </label>
+      <!-- Honeypot field for bots: hidden from real visitors -->
+      <label class="hp" aria-hidden="true">Website <input name="website" tabindex="-1" autocomplete="off"></label>
+      <button type="submit">Send my details</button>
+      <p class="status" role="status" aria-live="polite"></p>
+      <p class="alt">Prefer chat? <a id="whatsapp-link" href="#" target="_blank" rel="noopener">Message us on WhatsApp</a></p>
+    </form>
+  </main>
+
+  <script>
+    // 1. Paste your Apps Script Web app URL here (see README.md).
+    const ENDPOINT = 'https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec';
+    // 2. Your WhatsApp number in international format, digits only.
+    const WHATSAPP_NUMBER = '971500000000';
+
+    const form = document.getElementById('lead-form');
+    const statusEl = form.querySelector('.status');
+    const button = form.querySelector('button');
+    document.getElementById('whatsapp-link').href =
+      'https://wa.me/' + WHATSAPP_NUMBER + '?text=' + encodeURIComponent('Hi, I would like pricing and floor plans.');
+
+    // Keep UTM tags from the ad click so every lead shows which campaign it came from.
+    const params = new URLSearchParams(location.search);
+    const tracking = {
+      utm_source: params.get('utm_source') || '',
+      utm_medium: params.get('utm_medium') || '',
+      utm_campaign: params.get('utm_campaign') || '',
+      page_url: location.href,
+    };
+
+    function showStatus(message, type) {
+      statusEl.textContent = message;
+      statusEl.className = 'status ' + (type || '');
+    }
+
+    function validate(data) {
+      const phoneDigits = data.phone.replace(/\D/g, '');
+      if (data.name.trim().length < 2) return 'Please enter your name.';
+      if (!data.email && !phoneDigits) return 'Please enter an email or phone number.';
+      if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) return 'Please enter a valid email.';
+      if (phoneDigits && (phoneDigits.length < 7 || phoneDigits.length > 15)) return 'Please enter a valid phone number.';
+      return '';
+    }
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const data = Object.fromEntries(new FormData(form).entries());
+      const error = validate(data);
+      if (error) return showStatus(error, 'error');
+
+      button.disabled = true;
+      showStatus('Sending…');
+      try {
+        // URL-encoded body keeps this a "simple" request, so Apps Script needs no CORS preflight.
+        const response = await fetch(ENDPOINT, {
+          method: 'POST',
+          body: new URLSearchParams({ ...data, ...tracking }),
+        });
+        const result = await response.json();
+        if (!result.ok) throw new Error((result.errors || ['Please try again.']).join(' '));
+        form.reset();
+        showStatus('Thank you! Our team will call you shortly.', 'ok');
+      } catch (err) {
+        showStatus(err.message || 'Could not send. Please try WhatsApp instead.', 'error');
+      } finally {
+        button.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
